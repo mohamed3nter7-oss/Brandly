@@ -1,292 +1,489 @@
-mport 'package:brand/signup_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+class SignUpPage extends StatefulWidget {
+  const SignUpPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  State<SignUpPage> createState() => _SignUpPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
-  final TextEditingController usernameController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
-  final GlobalKey<FormState> formState = GlobalKey<FormState>();
+class _SignUpPageState extends State<SignUpPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _brandNameController = TextEditingController();
+  String selectedRole = "customer";
+  String selectedCategory = "Fashion";
+  bool _isLoading = false;
+
+  final List<String> categories = [
+    'Fashion',
+    'Electronics',
+    'Beauty',
+    'Sports',
+    'Home & Garden',
+    'Food & Beverage',
+    'Books',
+    'Toys',
+    'Other'
+  ];
 
   @override
   void dispose() {
-    usernameController.dispose();
-    passwordController.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _brandNameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _signUp() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    // تحقق من brand name للـ sellers
+    if (selectedRole == 'seller' && _brandNameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your brand name'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      // 1️⃣ إنشاء حساب المستخدم
+      final credential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+      final uid = credential.user!.uid;
+
+      // 2️⃣ حفظ بيانات المستخدم في users collection
+      Map<String, dynamic> userData = {
+        'name': _nameController.text.trim(),
+        'email': _emailController.text.trim(),
+        'role': selectedRole,
+        'createdAt': FieldValue.serverTimestamp(),
+        'brandName': _brandNameController.text.trim(),
+      };
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .set(userData);
+
+      // 3️⃣ إذا كان seller، إنشاء brand document
+      if (selectedRole == 'seller') {
+        final brandRef =
+            await FirebaseFirestore.instance.collection('brand').add({
+          'name': _brandNameController.text.trim(),
+          'category': selectedCategory,
+          'sellerId': uid,
+          'sellerName': _nameController.text.trim(),
+          'sellerEmail': _emailController.text.trim(),
+          'description': '',
+          'logo': '',
+          'image': '', // Add image field for brand cover
+          'isActive': true,
+          'rating': 0.0,
+          'totalOrders': 0,
+          'totalRevenue': 0.0,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        // تحديث user document بالـ brandId
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .update({'brandId': brandRef.id});
+      }
+
+      if (!mounted) return;
+
+      // 4️⃣ رسالة نجاح
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('🎉 Account created successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // 5️⃣ الانتقال حسب نوع الحساب
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+
+      if (selectedRole == 'customer') {
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        Navigator.pushReplacementNamed(context, '/seller-home');
+      }
+    } on FirebaseAuthException catch (e) {
+      String msg = 'Signup failed';
+      if (e.code == 'email-already-in-use') {
+        msg = 'This email is already registered';
+      } else if (e.code == 'weak-password') {
+        msg = 'Password is too weak (min 6 characters)';
+      } else if (e.code == 'invalid-email') {
+        msg = 'Invalid email format';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: Colors.red),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          // Background
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF6B5FED), Color(0xFF8B7FFF)],
-              ),
-            ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFF3E5F5), // Lavender light
+              Color(0xFFE1BEE7), // Lavender medium
+              Color(0xFFCE93D8), // Lavender deep
+            ],
           ),
-          // Title
-          Positioned(
-            top: 60,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Text(
-                'Brandly',
-                style: TextStyle(
-                  fontSize: 60,
-                  fontWeight: FontWeight.w300,
-                  fontStyle: FontStyle.italic,
-                  color: Colors.white,
-                  letterSpacing: 2,
-                  shadows: const [
-                    Shadow(
-                      blurRadius: 10.0,
-                      color: Colors.black26,
-                      offset: Offset(3, 3),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // White rounded container
-          Positioned(
-            top: 180,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(200),
-                  topRight: Radius.circular(200),
-                ),
-              ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: Form(
-                  key: formState,
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 80),
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Login',
-                          style: TextStyle(
-                            fontSize: 40,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Welcome back',
-                          style: TextStyle(
-                            fontSize: 20,
-                            color: Colors.grey[700],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 40),
-                      // Username Field
-                      _buildInputField(
-                        controller: usernameController,
-                        hint: "Username",
-                        icon: Icons.person,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return "Username is required";
-                          }
-                          if (!value.contains('@')) {
-                            return "Username must contain @";
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 25),
-                      // Password
-                      _buildInputField(
-                        controller: passwordController,
-                        hint: "Password",
-                        icon: Icons.lock,
-                        obscure: true,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return "Password is required";
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () {},
-                          child: const Text(
-                            'Forgot Password?',
-                            style: TextStyle(
-                              color: Color(0xFF6B5FED),
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 30),
-                      // Login button
-                      Container(
-                        width: double.infinity,
-                        height: 55,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF6B5FED), Color(0xFF8B7FFF)],
-                          ),
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        child: MaterialButton(
-                          onPressed: () {
-                            if (formState.currentState!.validate()) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text("Login successful!")),
-                              );
-                            }
-                          },
-                          child: const Text(
-                            "Login",
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 30),
-                      const Text("or",
-                          style: TextStyle(fontSize: 16, color: Colors.grey)),
-                      const SizedBox(height: 30),
-                      // Social buttons row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          CircleAvatar(
-                            radius: 30,
-                            backgroundColor: Colors.black,
-                            child: Icon(Icons.apple, color: Colors.white),
-                          ),
-                          SizedBox(width: 25),
-                          CircleAvatar(
-                            radius: 30,
-                            backgroundColor: Color(0xFF1877F2),
-                            child: Text("f",
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 36)),
-                          ),
-                          SizedBox(width: 25),
-                          CircleAvatar(
-                            radius: 30,
-                            backgroundColor: Colors.white,
-                            child: Text("G",
-                                style: TextStyle(
-                                    fontSize: 32, fontWeight: FontWeight.bold)),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Logo/Icon
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF6B5FED).withOpacity(0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 30),
-                      // Navigate to signup
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            "Don't have an account?",
-                            style: TextStyle(
-                                fontSize: 16, color: Colors.grey[700]),
+                      child: const Icon(
+                        Icons.shopping_bag_rounded,
+                        size: 50,
+                        color: Color(0xFF9C27B0),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+
+                    // Title
+                    const Text(
+                      "Create Account",
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Color.fromARGB(255, 105, 65, 154),
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      "Join us today!",
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFF6A1B9A),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+
+                    // Role Selection
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
                           ),
-                          TextButton(
-                            onPressed: () {
-                              print("SIGNUP BUTTON PRESSED !!!");
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => const SignUpPage()),
-                              );
-                            },
-                            child: const Text(
-                              "Sign Up",
-                              style: TextStyle(
-                                color: Color(0xFF6B5FED),
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () =>
+                                  setState(() => selectedRole = "customer"),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: selectedRole == "customer"
+                                      ? const Color(0xFF9C27B0)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    "Customer",
+                                    style: TextStyle(
+                                      color: selectedRole == "customer"
+                                          ? Colors.white
+                                          : const Color(0xFF9C27B0),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () =>
+                                  setState(() => selectedRole = "seller"),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: selectedRole == "seller"
+                                      ? const Color(0xFF9C27B0)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    "Seller",
+                                    style: TextStyle(
+                                      color: selectedRole == "seller"
+                                          ? Colors.white
+                                          : const Color(0xFF9C27B0),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 40),
+                    ),
+                    const SizedBox(height: 30),
+
+                    // Name Field
+                    _buildTextField(
+                      controller: _nameController,
+                      label: "Full Name",
+                      icon: Icons.person,
+                      validator: (val) =>
+                          val!.isEmpty ? 'Please enter your name' : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Email Field
+                    _buildTextField(
+                      controller: _emailController,
+                      label: "Email",
+                      icon: Icons.email,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (val) {
+                        if (val!.isEmpty) return 'Please enter email';
+                        if (!val.contains('@')) return 'Invalid email';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Password Field
+                    _buildTextField(
+                      controller: _passwordController,
+                      label: "Password",
+                      icon: Icons.lock,
+                      obscureText: true,
+                      validator: (val) {
+                        if (val!.isEmpty) return 'Please enter password';
+                        if (val.length < 6) return 'Min 6 characters';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Brand Name Field (only for sellers)
+                    if (selectedRole == 'seller') ...[
+                      _buildTextField(
+                        controller: _brandNameController,
+                        label: "Brand Name",
+                        icon: Icons.store,
+                        validator: (val) =>
+                            val!.isEmpty ? 'Please enter brand name' : null,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Category Dropdown
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(15),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: DropdownButtonFormField<String>(
+                          // initialValue: selectedCategory,
+                          decoration: InputDecoration(
+                            labelText: 'Brand Category',
+                            prefixIcon: const Icon(Icons.category,
+                                color: Color(0xFF9C27B0)),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(15),
+                              borderSide: BorderSide.none,
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          items: categories.map((category) {
+                            return DropdownMenuItem(
+                              value: category,
+                              child: Text(category),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() => selectedCategory = value!);
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                     ],
-                  ),
+
+                    const SizedBox(height: 30),
+
+                    // Sign Up Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _signUp,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF9C27B0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          elevation: 5,
+                          shadowColor: const Color(0xFF9C27B0).withOpacity(0.5),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
+                                ),
+                              )
+                            : const Text(
+                                "Sign Up",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Login Link
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          "Already have an account? ",
+                          style: TextStyle(color: Color(0xFF6A1B9A)),
+                        ),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: const Text(
+                            "Login",
+                            style: TextStyle(
+                              color: Color(0xFF9C27B0),
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                  ],
                 ),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  // ---- Reusable Input Field ----
-  Widget _buildInputField({
+  Widget _buildTextField({
     required TextEditingController controller,
-    required String hint,
+    required String label,
     required IconData icon,
-    required String? Function(String?) validator,
-    bool obscure = false,
+    bool obscureText = false,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(30),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(
-              color: Color(0xFF6B5FED),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: Colors.white),
-          ),
-          Expanded(
-            child: TextFormField(
-              controller: controller,
-              obscureText: obscure,
-              validator: validator,
-              decoration: InputDecoration(
-                hintText: hint,
-                border: InputBorder.none,
-              ),
-            ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
           ),
         ],
+      ),
+      child: TextFormField(
+        controller: controller,
+        obscureText: obscureText,
+        keyboardType: keyboardType,
+        validator: validator,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, color: const Color(0xFF9C27B0)),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: BorderSide.none,
+          ),
+          filled: true,
+          fillColor: Colors.white,
+        ),
       ),
     );
   }

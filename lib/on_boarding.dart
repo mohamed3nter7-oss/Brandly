@@ -3,7 +3,7 @@ import 'dart:async';
 
 // Splash Screen
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+  const SplashScreen({super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -29,7 +29,7 @@ class _SplashScreenState extends State<SplashScreen> {
         color: const Color((0xFF6C63FF),),
         child: Center(
         child: Image.asset(
-          'assets/images/p1.png',
+          'assets/images/P1.png',
           width: 200,
           height: 200,
         ),
@@ -39,9 +39,10 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
+
 // Onboarding Screen with PageView
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({Key? key}) : super(key: key);
+  const OnboardingScreen({super.key});
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -186,7 +187,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 class OnboardingPageWidget extends StatelessWidget {
   final OnboardingPage page;
 
-  const OnboardingPageWidget({Key? key, required this.page}) : super(key: key);
+  const OnboardingPageWidget({super.key, required this.page});
 
   @override
   Widget build(BuildContext context) {

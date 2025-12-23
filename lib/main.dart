@@ -1,38 +1,36 @@
+import 'package:brandly4/seller_profile_page.dart';
 import 'package:flutter/material.dart';
-/*import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
-import 'firebase_options.dart';*/
-
+import 'package:firebase_core/firebase_core.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+// Firebase options
+import 'firebase_options.dart';
+// Pages
+import 'on_boarding.dart';
 import 'login_page.dart';
 import 'signup.dart';
 import 'forget_password.dart';
-import 'on_boarding.dart';
-import 'profile.dart';
+import 'home_page.dart';
 import 'search_page.dart';
 import 'favourite_page.dart';
-import 'home_page.dart';
 import 'setting_page.dart';
-import 'auth_screen.dart';
+import 'favourite_service.dart';
+import 'notifications_page.dart';
+import 'language.dart';
+import 'privacy_policy_page.dart';
+import 'change_password_page.dart';
+import 'aboutpage.dart';
+import 'card_page.dart';
+import 'add_product_page.dart';
+import 'my_products_page.dart';
+import 'seller_home.dart';
+import 'CheckoutScreen.dart';
 
-
-//import 'package:supabase_flutter/supabase_flutter.dart';
-//import 'package:shared_preferences/shared_preferences.dart';
-
-/*void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  await Supabase.initialize(
-    url: 'https://srqplefdunarhgmppofa.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNycXBsZWZkdW5hcmhnbXBwb2ZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5Nzc3NDcsImV4cCI6MjA4MDU1Mzc0N30.EbRsC-zeCb8fUx9XkotEszx5B0UxchV9kmYLvpTQiIc',
-  );
-
   runApp(const MyApp());
-}*/
+}
+
+/// ROOT APP
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -40,146 +38,111 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Brandly',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.purple,
-        fontFamily: 'Roboto',
-        useMaterial3: true,
-      ),
+        title: 'Brandly',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          primarySwatch: Colors.purple,
+          fontFamily: 'Roboto',
+          useMaterial3: true,
+        ),
 
-      
-     home: const SplashScreen(),
+        // 👇 Initialize SDKs inside splash flow
+        home: const AppInitializer(),
+        routes: {
+          '/login': (context) => LoginPage(),
+          '/signup': (context) => const SignUpPage(),
+          '/forgot-password': (context) => const ForgotPasswordPage(),
+          '/home': (context) => const NewHomePage(),
+          '/search': (context) => const BrandSearchPage(),
+          //   '/favorites': (context) =>  const FavoritesPage (),
+          '/settings': (context) => const SettingsPage(),
+          '/seller-home': (context) => const SellerHomePage(),
+          '/cart': (context) => const CartPage(),
+          '/aboutpage': (context) => const AboutPage(),
+          '/language': (context) => LanguagePage(),
+          '/policy': (context) => const PrivacyPolicyPage(),
+          '/notification': (context) => const NotificationsPage(),
+          '/change-password': (context) => const ChangePasswordPage(),
+          '/add-product': (context) => const AddProductPage(),
+          '/my-products': (context) => const MyProductsPage(),
+          '/seller_profile': (context) => const SellerMyProfilePage(),
+          '/checkout': (context) {
+            final args = ModalRoute.of(context)!.settings.arguments
+                as Map<String, dynamic>;
 
-
-      routes: {
-        '/onboarding': (context) => const OnboardingScreen(),
-        '/auth': (context) => const AuthScreen(),
-        '/login': (context) =>  LoginPage(),
-        '/signup': (context) => const SignUpPage(),
-        '/forgot-password': (context) => const ForgotPasswordPage(),
-        '/home': (context) => const NewHomePage(),
-        '/profile': (context) => const MyProfilePage(),
-        '/search': (context) => const BrandSearchPage(),
-        '/favorites': (context) => const FavoritesPage(),
-        '/settings': (context) => const SettingsPage(),
-      },
-    );
+            return CheckoutScreen(
+              profileName: args['profileName'],
+              subtotal: args['subtotal'],
+              discount: args['discount'],
+              appliedPromo: args['appliedPromo'],
+              cartItems: args['cartItems'],
+            );
+          }
+        });
   }
 }
 
-/*class AuthWrapper extends StatelessWidget {
-  const AuthWrapper({super.key});
+/// INITIALIZATION WIDGET (Firebase + Supabase)
+
+class AppInitializer extends StatefulWidget {
+  const AppInitializer({super.key});
+
+  @override
+  State<AppInitializer> createState() => _AppInitializerState();
+}
+
+class _AppInitializerState extends State<AppInitializer> {
+  late final Future<void> _initFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _initFuture = _initializeServices();
+  }
+
+  Future<void> _initializeServices() async {
+    // Supabase
+    await Supabase.initialize(
+      url: 'https://yilzcdtkjezpngwnxjaa.supabase.co',
+      anonKey:
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpbHpjZHRramV6cG5nd254amFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2NDk1MTMsImV4cCI6MjA4MTIyNTUxM30.7XwIyJbaul8aGh7bx39VUSWPn8bLJwn-YqNpuTm9mhw',
+    );
+
+    // Firebase
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<fb_auth.User?>(
-      stream: fb_auth.FirebaseAuth.instance.authStateChanges(),
+    return FutureBuilder<void>(
+      future: _initFuture,
       builder: (context, snapshot) {
+        // Loading
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-              body: Center(child: CircularProgressIndicator()));
-        }
-
-        if (snapshot.hasData) {
-          return const NewHomePage();
-        }
-
-        return const AuthScreen();
-      },
-    );
-  }
-}f
-
-import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import 'firebase_options.dart';
-
-// Screens
-import 'auth_screen.dart';
-import 'on_boarding.dart';
-import 'home_page.dart'; // NewHomePage
-import 'on_boarding.dart';
-
-bool shouldShowOnboarding = true;
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  // Read onboarding state
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final completed = prefs.getBool('onboarding_complete') ?? false;
-    shouldShowOnboarding = !completed; // true = show Onboarding
-  } catch (e) {
-    print("Error with SharedPreferences: $e");
-    shouldShowOnboarding = true;
-  }
-
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: "Brandly",
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.purple),
-      home: const InitialScreen(),  // ← أهم سطر
-    );
-  }
-}
-
-class InitialScreen extends StatelessWidget {
-  const InitialScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-
-        // Loading / Splash
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SplashScreen();
-        }
-
-        // Error state
-        if (snapshot.hasError) {
           return const Scaffold(
             body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+
+        // Error
+        if (snapshot.hasError) {
+          return Scaffold(
+            body: Center(
               child: Text(
-                "Authentication error.\nCheck Firebase settings.",
+                'Initialization error:\n${snapshot.error}',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.red),
               ),
             ),
           );
         }
 
-        // 1) User logged in → Go to Home
-        if (snapshot.hasData) {
-          return const NewHomePage();
-        }
-
-        // 2) User NOT logged in → Show Onboarding if needed
-        if (shouldShowOnboarding) {
-          return const OnboardingScreen();
-        }
-
-        // 3) User NOT logged in + already saw Onboarding
-        return const AuthScreen();
+        // Success → go to Splash / OnBoarding
+        return const SplashScreen();
       },
     );
- }*/
+  }
+}
